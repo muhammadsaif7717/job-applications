@@ -10,7 +10,8 @@ import {
   Edit3, 
   Trash2,
   Filter,
-  BriefcaseIcon 
+  BriefcaseIcon,
+  ExternalLink 
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -42,16 +43,16 @@ const STATUS_CONFIG: Record<
   JobStatus,
   { label: string; bg: string; text: string; dot: string }
 > = {
-  applied:   { label: "Applied",   bg: "bg-sky-500/10 border-sky-500/20",    text: "text-sky-400",    dot: "bg-sky-400"    },
-  interview: { label: "Interview", bg: "bg-amber-500/10 border-amber-500/20",  text: "text-amber-400",  dot: "bg-amber-400"  },
-  rejected:  { label: "Rejected",  bg: "bg-rose-500/10 border-rose-500/20",   text: "text-rose-400",   dot: "bg-rose-400"   },
-  offer:     { label: "Offer",     bg: "bg-emerald-500/10 border-emerald-500/20",text: "text-emerald-400",dot: "bg-emerald-400" },
+  applied:   { label: "Applied",   bg: "bg-sky-500/10 border-sky-200/30",    text: "text-sky-700",    dot: "bg-sky-500"    },
+  interview: { label: "Interview", bg: "bg-amber-500/10 border-amber-200/30",  text: "text-amber-700",  dot: "bg-amber-500"  },
+  rejected:  { label: "Rejected",  bg: "bg-rose-500/10 border-rose-200/30",   text: "text-rose-700",   dot: "bg-rose-500"   },
+  offer:     { label: "Offer",     bg: "bg-emerald-500/10 border-emerald-200/30",text: "text-emerald-700",dot: "bg-emerald-500" },
 };
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; bg: string }> = {
-  high:   { label: "High",   color: "text-rose-400", bg: "bg-rose-500/10"   },
-  medium: { label: "Medium", color: "text-amber-400", bg: "bg-amber-500/10"  },
-  low:    { label: "Low",    color: "text-slate-400", bg: "bg-slate-500/10"  },
+  high:   { label: "High",   color: "text-rose-600", bg: "bg-rose-100/80"   },
+  medium: { label: "Medium", color: "text-amber-600", bg: "bg-amber-100/80"  },
+  low:    { label: "Low",    color: "text-gray-500", bg: "bg-gray-100/80"  },
 };
 
 const TYPE_CONFIG: Record<JobType, { label: string; icon: string }> = {
@@ -65,7 +66,7 @@ const TYPE_CONFIG: Record<JobType, { label: string; icon: string }> = {
 const StatusBadge = ({ status }: { status: JobStatus }) => {
   const c = STATUS_CONFIG[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${c.bg} ${c.text} backdrop-blur-sm`}>
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border shadow-sm ${c.bg} ${c.text} backdrop-blur-sm border-opacity-50`}>
       <span className={`w-2 h-2 rounded-full ${c.dot}`} />
       {c.label}
     </span>
@@ -75,7 +76,7 @@ const StatusBadge = ({ status }: { status: JobStatus }) => {
 const PriorityFlag = ({ priority }: { priority: Priority }) => {
   const c = PRIORITY_CONFIG[priority];
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${c.bg} ${c.color}`}>
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm ${c.bg} ${c.color}`}>
       ⚑ {c.label}
     </span>
   );
@@ -95,8 +96,8 @@ const ActionButton = ({
   <button
     onClick={onClick}
     className={`
-      p-2 rounded-xl text-slate-400 hover:text-white transition-all duration-200 hover:scale-105
-      ${variant === "destructive" ? "hover:text-rose-400 hover:bg-rose-500/10" : "hover:bg-slate-800/50"}
+      p-2.5 rounded-2xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all duration-200 hover:shadow-md hover:scale-105 backdrop-blur-sm
+      ${variant === "destructive" ? "hover:text-rose-500 hover:bg-rose-50" : ""}
       ${className}
     `}
     title={variant === "destructive" ? "Delete" : "Edit"}
@@ -122,56 +123,54 @@ const JobCard = ({ job, onDelete }: { job: Job; onDelete: (id: string) => void }
 
   return (
     <div className={`
-      group/card relative rounded-3xl border p-6 flex flex-col gap-4 h-fit
-      transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-slate-600/50
-      backdrop-blur-sm bg-slate-900/80 border-slate-700/50
-      ${!job.isActive && "opacity-60 bg-slate-900/40 border-slate-800/30"}
+      group/card relative rounded-3xl border p-8 flex flex-col gap-6 h-fit shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-3 hover:border-blue-200/50 backdrop-blur-sm
+      bg-white/80 border-gray-200/50 ${!job.isActive && "opacity-70 bg-gray-50/80 border-gray-100/50"}
     `}>
-      {/* Gradient accent */}
-      <div className="absolute top-4 right-4 w-2 h-20 bg-gradient-to-b from-sky-400 to-indigo-500 rounded-full blur-sm opacity-60" />
+      {/* Gradient accent bar */}
+      <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-t-3xl" />
       
       {/* Top row */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="text-white font-bold text-lg leading-tight truncate group-hover/card:text-sky-400">
+          <h3 className="text-2xl font-black text-gray-900 leading-tight truncate group-hover/card:text-blue-600">
             {job.companyName}
           </h3>
-          <p className="text-slate-400 text-sm mt-1 font-medium truncate">{job.position}</p>
+          <p className="text-gray-700 text-lg mt-1 font-semibold truncate">{job.position}</p>
         </div>
         <StatusBadge status={job.status} />
       </div>
 
       {/* Meta grid */}
-      <div className="grid grid-cols-2 gap-4 text-xs text-slate-400">
-        <div className="flex items-center gap-2">
-          <MapPin className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
-          {job.location}
+      <div className="grid grid-cols-2 gap-6 text-sm text-gray-600">
+        <div className="flex items-center gap-3 p-3 bg-gray-50/50 rounded-2xl backdrop-blur-sm">
+          <MapPin className="w-5 h-5 text-blue-500 flex-shrink-0" />
+          <span className="font-medium">{job.location}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Globe className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-          {TYPE_CONFIG[job.jobType].label}
+        <div className="flex items-center gap-3 p-3 bg-gray-50/50 rounded-2xl backdrop-blur-sm">
+          <Globe className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+          <span className="font-medium">{TYPE_CONFIG[job.jobType].label}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Link2 className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
-          via {job.via}
+        <div className="flex items-center gap-3 p-3 bg-gray-50/50 rounded-2xl backdrop-blur-sm">
+          <Link2 className="w-5 h-5 text-purple-500 flex-shrink-0" />
+          <span>via {job.via}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Calendar className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-          {job.date}
+        <div className="flex items-center gap-3 p-3 bg-gray-50/50 rounded-2xl backdrop-blur-sm">
+          <Calendar className="w-5 h-5 text-amber-500 flex-shrink-0" />
+          <span className="font-medium">{job.date}</span>
         </div>
       </div>
 
       {/* Note */}
       {job.note && (
-        <div className="bg-slate-800/50 border border-slate-700/40 rounded-2xl p-4 backdrop-blur-sm">
-          <p className="text-sm text-slate-300 italic leading-relaxed">"{job.note}"</p>
+        <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-100/50 rounded-2xl p-6 backdrop-blur-sm shadow-inner">
+          <p className="text-gray-700 italic leading-relaxed text-base">"{job.note}"</p>
         </div>
       )}
 
       {/* Action row */}
-      <div className="flex items-center justify-between pt-4 border-t border-slate-800/50">
+      <div className="flex items-center justify-between pt-6 border-t border-gray-200/50">
         <PriorityFlag priority={job.priority} />
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <ActionButton icon={Edit3} onClick={() => window.location.href = `/update/${job._id}`} />
           <ActionButton icon={Trash2} onClick={handleDelete} variant="destructive" />
         </div>
@@ -179,10 +178,10 @@ const JobCard = ({ job, onDelete }: { job: Job; onDelete: (id: string) => void }
           href={job.jobLink}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-sm text-sky-400 hover:text-sky-300 font-medium transition-all duration-200 group-hover/card:translate-x-1"
+          className="inline-flex items-center gap-2 text-base text-blue-600 hover:text-blue-700 font-semibold transition-all duration-200 group-hover/card:translate-x-2 bg-blue-50/50 hover:bg-blue-100 px-4 py-2.5 rounded-2xl backdrop-blur-sm hover:shadow-md"
         >
           View Listing 
-          <BriefcaseIcon className="w-3.5 h-3.5 group-hover/card:rotate-3 transition-transform duration-200" />
+          <ExternalLink className="w-4 h-4 group-hover/card:translate-y-0.5 transition-transform duration-200" />
         </a>
       </div>
     </div>
@@ -201,20 +200,20 @@ const StatsBar = ({ jobs }: { jobs: Job[] }) => {
   };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 p-6 bg-slate-900/50 rounded-3xl border border-slate-800/50 backdrop-blur-sm">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 p-8 bg-gradient-to-r from-gray-50 to-blue-50/30 rounded-3xl border border-gray-200/50 shadow-xl backdrop-blur-sm">
       {(["applied", "interview", "rejected", "offer"] as JobStatus[]).map(s => {
         const c = STATUS_CONFIG[s];
         const count = counts[s] as number;
         return (
           <div 
             key={s} 
-            className="group relative flex flex-col items-center gap-2 p-4 rounded-2xl transition-all duration-200 hover:scale-105 hover:bg-white/5"
+            className="group relative flex flex-col items-center gap-3 p-6 rounded-2xl transition-all duration-300 hover:scale-105 hover:shadow-lg hover:-translate-y-1 bg-white/60 backdrop-blur-sm border border-gray-200/30"
           >
-            <div className={`w-3 h-3 rounded-full ${c.dot} absolute -top-1 -right-1 shadow-lg`} />
-            <div className={`text-3xl font-black ${c.text} group-hover:scale-110 transition-transform`}>
+            <div className={`w-4 h-4 rounded-full ${c.dot} absolute -top-2 -right-2 shadow-lg ring-2 ring-white/50`} />
+            <div className={`text-3xl md:text-4xl font-black ${c.text} group-hover:scale-110 transition-all duration-300`}>
               {count}
             </div>
-            <span className="text-xs text-slate-400 uppercase tracking-wider font-medium text-center">
+            <span className="text-xs text-gray-600 uppercase tracking-wider font-semibold text-center">
               {c.label}
             </span>
           </div>
@@ -235,23 +234,23 @@ const FilterBar = ({
   active: JobStatus | "all";
   onChange: (s: JobStatus | "all") => void;
 }) => (
-  <div className="flex flex-wrap gap-3 mb-8 p-4 bg-slate-900/30 rounded-2xl border border-slate-800/30 backdrop-blur-sm">
-    <div className="flex items-center gap-2 text-sm text-slate-400 mb-3">
-      <Filter className="w-4 h-4" />
+  <div className="flex flex-wrap gap-4 mb-12 p-6 bg-white/70 rounded-3xl border border-gray-200/50 shadow-lg backdrop-blur-sm">
+    <div className="flex items-center gap-3 text-sm text-gray-700 font-semibold mb-4">
+      <Filter className="w-5 h-5 text-blue-500" />
       Filter by status
     </div>
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-3">
       {ALL_STATUSES.map(s => {
         const isActive = s === active;
-        const label = s === "all" ? "All" : STATUS_CONFIG[s as JobStatus].label;
+        const label = s === "all" ? "All Jobs" : STATUS_CONFIG[s as JobStatus].label;
         return (
           <button
             key={s}
             onClick={() => onChange(s)}
-            className={`px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-300 backdrop-blur-sm border
+            className={`px-6 py-3 rounded-2xl text-sm font-bold transition-all duration-300 shadow-md backdrop-blur-sm border-2
               ${isActive
-                ? "bg-gradient-to-r from-white to-slate-100 text-slate-900 shadow-xl shadow-white/20 scale-105 border-white/30"
-                : "bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 hover:text-white hover:border-slate-600/50 border-slate-700/30 hover:scale-[1.02]"
+                ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-xl hover:shadow-2xl hover:scale-105 border-blue-300"
+                : "bg-gray-100/80 text-gray-700 hover:bg-gray-200 hover:text-gray-900 hover:shadow-lg hover:border-gray-300 border-gray-200/50"
               }`}
           >
             {label}
@@ -265,31 +264,33 @@ const FilterBar = ({
 // ── Loading & Empty States ───────────────────────────────────────────────────
 
 const LoadingSkeleton = () => (
-  <div className="space-y-4">
+  <div className="space-y-6">
     {[...Array(4)].map((_, i) => (
-      <div key={i} className="animate-pulse bg-slate-900/50 rounded-3xl p-6">
-        <div className="h-6 bg-slate-800/50 rounded-xl w-3/4 mb-4"></div>
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="h-4 bg-slate-800/30 rounded w-20"></div>
-          <div className="h-4 bg-slate-800/30 rounded w-24"></div>
+      <div key={i} className="animate-pulse bg-white/70 rounded-3xl p-8 shadow-xl border border-gray-200/50">
+        <div className="h-8 bg-gray-200/50 rounded-2xl w-3/4 mb-6"></div>
+        <div className="grid grid-cols-2 gap-6 mb-8">
+          <div className="h-12 bg-gray-200/30 rounded-2xl"></div>
+          <div className="h-12 bg-gray-200/30 rounded-2xl"></div>
         </div>
-        <div className="h-20 bg-slate-800/30 rounded-2xl mb-6"></div>
-        <div className="h-10 bg-slate-800/20 rounded-xl w-32"></div>
+        <div className="h-20 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-2xl mb-8"></div>
+        <div className="h-12 bg-gray-100/50 rounded-2xl w-40 flex items-center justify-center">
+          <div className="w-8 h-8 bg-gray-200/50 rounded-full animate-spin"></div>
+        </div>
       </div>
     ))}
   </div>
 );
 
 const EmptyState = ({ filter }: { filter: string }) => (
-  <div className="text-center py-20 px-8 bg-slate-900/30 rounded-3xl border-2 border-dashed border-slate-700/50">
-    <div className="w-24 h-24 bg-gradient-to-br from-slate-800/50 to-transparent rounded-3xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm">
-      <Briefcase className="w-12 h-12 text-slate-500" />
+  <div className="text-center py-24 px-12 bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-3xl border-2 border-dashed border-gray-200 shadow-xl">
+    <div className="w-28 h-28 bg-gradient-to-br from-gray-100 to-blue-100/50 rounded-3xl flex items-center justify-center mx-auto mb-8 backdrop-blur-sm shadow-lg border border-gray-200/50">
+      <Briefcase className="w-14 h-14 text-gray-400" />
     </div>
-    <h3 className="text-xl font-bold text-white mb-2">No jobs {filter !== 'all' ? `in "${filter}"` : 'yet'}</h3>
-    <p className="text-slate-400 text-sm max-w-md mx-auto mb-6">
+    <h3 className="text-3xl font-black text-gray-900 mb-4">No jobs {filter !== 'all' ? `in "${filter}"` : 'yet'}</h3>
+    <p className="text-gray-600 text-lg max-w-lg mx-auto mb-8 font-medium leading-relaxed">
       {filter !== 'all' 
-        ? `No jobs match the "${filter}" filter. Try adjusting your filter above.`
-        : "Get started by adding your first job application."
+        ? `No jobs match the "${filter}" filter. Try adjusting your filter above or add a new application.`
+        : "Get started by adding your first job application using the + button in the top nav."
       }
     </p>
   </div>
@@ -324,38 +325,24 @@ export default function AppliedJobs() {
   const filteredJobs = filter === "all" ? jobs : jobs.filter(j => j.status === filter);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-6 relative overflow-hidden">
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-sky-500/20 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
-        <div className="absolute top-1/2 right-1/4 w-72 h-72 bg-emerald-500/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-1/4 left-1/2 w-72 h-72 bg-rose-500/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 text-gray-900 p-8 relative overflow-hidden">
+      {/* Subtle background elements */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-blue-200/30 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
+        <div className="absolute top-1/2 right-1/4 w-80 h-80 bg-emerald-200/30 rounded-full mix-blend-multiply filter blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
+        <div className="absolute bottom-1/4 left-1/2 w-80 h-80 bg-indigo-200/30 rounded-full mix-blend-multiply filter blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
       </div>
 
-      <style jsx>{`
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 { animation-delay: 2s; }
-        .animation-delay-4000 { animation-delay: 4s; }
-      `}</style>
-
-      <div className="max-w-4xl mx-auto relative z-10">
+      <div className="max-w-6xl mx-auto relative z-10">
         {/* Header */}
-        <div className="text-center mb-12 pt-12">
-          <div className="inline-flex items-center gap-4 mb-4 px-8 py-4 bg-slate-900/50 backdrop-blur-xl rounded-3xl border border-slate-800/50">
-            <div className="w-3 h-12 bg-gradient-to-b from-sky-400 via-indigo-400 to-purple-500 rounded-2xl shadow-lg" />
+        <div className="text-center mb-16 pt-16">
+          <div className="inline-flex items-center gap-6 mb-8 px-12 py-8 bg-white/80 backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-2xl">
+            <div className="w-4 h-16 bg-gradient-to-b from-blue-500 via-indigo-500 to-purple-500 rounded-3xl shadow-xl" />
             <div>
-              <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent tracking-tight">
+              <h1 className="text-5xl md:text-6xl font-black bg-gradient-to-r from-gray-900 via-blue-600 to-indigo-700 bg-clip-text text-transparent tracking-tight">
                 Job Tracker
               </h1>
-              <p className="text-slate-400 text-lg mt-2">
+              <p className="text-gray-600 text-xl mt-3 font-semibold">
                 {jobs.length} applications • {new Date().toLocaleDateString()}
               </p>
             </div>
@@ -369,13 +356,13 @@ export default function AppliedJobs() {
         <FilterBar active={filter} onChange={setFilter} />
 
         {/* Content */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {loading ? (
             <LoadingSkeleton />
           ) : filteredJobs.length === 0 ? (
             <EmptyState filter={filter} />
           ) : (
-            <div className="grid gap-6">
+            <div className="grid md:grid-cols-2 gap-8">
               {filteredJobs.map(job => (
                 <JobCard key={job._id} job={job} onDelete={handleDelete} />
               ))}

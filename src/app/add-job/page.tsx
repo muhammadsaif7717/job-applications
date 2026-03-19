@@ -36,24 +36,21 @@ const INITIAL_FORM: JobFormData = {
   isActive: true,
 };
 
-
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
 
 // ── Small UI Atoms ────────────────────────────────────────────────────────────
 
 const Label = ({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) => (
   <label
     htmlFor={htmlFor}
-    className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5"
+    className="block text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1.5"
   >
     {children}
   </label>
 );
 
 const inputBase =
-  "w-full bg-slate-800/70 border border-slate-700/60 text-white text-sm rounded-xl px-4 py-2.5 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/60 focus:border-sky-500/50 transition-all duration-200";
+  "w-full bg-white/70 border border-gray-200/60 text-gray-900 text-sm rounded-xl px-4 py-2.5 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all duration-200 shadow-sm";
 
 const Input = ({
   id, name, type = "text", placeholder, value, onChange, required,
@@ -101,12 +98,12 @@ function PillGroup<T extends string>({
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 shadow-sm
               ${active
                 ? accent
                   ? `${accent} border-transparent shadow-lg scale-105`
-                  : "bg-white text-slate-900 border-transparent shadow-lg scale-105"
-                : "bg-slate-800 text-slate-400 border-slate-700/50 hover:bg-slate-700 hover:text-white"
+                  : "bg-white/80 text-gray-900 border-transparent shadow-lg scale-105"
+                : "bg-gray-100 text-gray-700 border-gray-200/50 hover:bg-gray-200 hover:text-gray-900"
               }`}
           >
             {opt.icon && <span className="mr-1">{opt.icon}</span>}
@@ -121,13 +118,13 @@ function PillGroup<T extends string>({
 // ── Success Toast ─────────────────────────────────────────────────────────────
 
 const SuccessToast = ({ id, onClose }: { id: string; onClose: () => void }) => (
-  <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-emerald-900/90 border border-emerald-500/40 text-emerald-300 px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-sm animate-fade-in">
+  <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-emerald-500/95 border border-emerald-400/50 text-white px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-sm animate-fade-in">
     <span className="text-lg">✅</span>
     <div>
       <p className="text-sm font-bold">Job added!</p>
-      <p className="text-xs text-emerald-500 font-mono">{id}</p>
+      <p className="text-xs font-mono">{id}</p>
     </div>
-    <button onClick={onClose} className="ml-2 text-emerald-500 hover:text-white transition-colors text-lg leading-none">×</button>
+    <button onClick={onClose} className="ml-2 text-white/80 hover:text-white transition-colors text-lg leading-none">×</button>
   </div>
 );
 
@@ -149,40 +146,40 @@ export default function AddJobForm({
   const setPill = <K extends keyof JobFormData>(field: K, value: JobFormData[K]) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
- const handleSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    // simulate delay (optional)
-    await new Promise((r) => setTimeout(r, 700));
+    try {
+      // simulate delay (optional)
+      await new Promise((r) => setTimeout(r, 700));
 
-    const now = new Date().toISOString().split("T")[0];
-    const newJob = { ...form, createdAt: now, updatedAt: now };
+      const now = new Date().toISOString().split("T")[0];
+      const newJob = { ...form, createdAt: now, updatedAt: now };
 
-    // 🔹 Axios POST request
-    const res = await axios.post("/api/v1/jobs/post", newJob);
+      // 🔹 Axios POST request
+      const res = await axios.post("/api/v1/jobs/post", newJob);
 
-    if (res.data.success) {
-      console.log("✅ New Job Submitted:", res.data.data);
-      setToast(`${res.data.data.companyName} added successfully!`);
-      
-      // reset form
-      setForm(INITIAL_FORM);
+      if (res.data.success) {
+        console.log("✅ New Job Submitted:", res.data.data);
+        setToast(`${res.data.data.companyName} added successfully!`);
+        
+        // reset form
+        setForm(INITIAL_FORM);
 
-      // optional: call parent submit callback
-      onSubmit?.(res.data.data);
-    } else {
-      console.error("❌ Submission failed:", res.data.message);
-      setToast("Submission failed");
+        // optional: call parent submit callback
+        onSubmit?.(res.data.data);
+      } else {
+        console.error("❌ Submission failed:", res.data.message);
+        setToast("Submission failed");
+      }
+    } catch (err) {
+      console.error("❌ Error submitting job:", err);
+      setToast("Error submitting job");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("❌ Error submitting job:", err);
-    setToast("Error submitting job");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <>
@@ -192,24 +189,24 @@ export default function AddJobForm({
       />
 
       <div
-        className="min-h-screen bg-slate-950 flex items-start justify-center p-6 py-10"
+        className="min-h-screen bg-gray-50 flex items-start justify-center p-6 py-10"
         style={{ fontFamily: "'DM Sans', sans-serif" }}
       >
         <div className="w-full max-w-2xl">
 
           {/* Header */}
           <div className="mb-8 flex items-center gap-3">
-            <div className="w-2 h-9 rounded-full bg-gradient-to-b from-sky-400 to-indigo-500" />
+            <div className="w-2 h-9 rounded-full bg-gradient-to-b from-blue-400 to-indigo-500" />
             <div>
-              <h1 className="text-2xl font-black text-white tracking-tight">Add Application</h1>
-              <p className="text-slate-500 text-sm">Track a new job you've applied to</p>
+              <h1 className="text-2xl font-black text-gray-900 tracking-tight">Add Application</h1>
+              <p className="text-gray-600 text-sm font-medium">Track a new job you've applied to</p>
             </div>
           </div>
 
           {/* Card */}
           <form
             onSubmit={handleSubmit}
-            className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col gap-6"
+            className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 flex flex-col gap-6 shadow-xl"
           >
 
             {/* Row 1: Company + Position */}
@@ -249,7 +246,7 @@ export default function AddJobForm({
             </div>
 
             {/* Divider */}
-            <div className="border-t border-slate-800" />
+            <div className="border-t border-gray-200" />
 
             {/* Job Type */}
             <div>
@@ -278,10 +275,10 @@ export default function AddJobForm({
                 value={form.status}
                 onChange={v => setPill("status", v)}
                 colorMap={{
-                  applied:   "bg-sky-500/20 text-sky-300 border-sky-500/40",
-                  interview: "bg-amber-500/20 text-amber-300 border-amber-500/40",
-                  rejected:  "bg-rose-500/20 text-rose-300 border-rose-500/40",
-                  offer:     "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+                  applied:   "bg-sky-500/20 text-sky-700 border-sky-300/50",
+                  interview: "bg-amber-500/20 text-amber-700 border-amber-300/50",
+                  rejected:  "bg-rose-500/20 text-rose-700 border-rose-300/50",
+                  offer:     "bg-emerald-500/20 text-emerald-700 border-emerald-300/50",
                 }}
               />
             </div>
@@ -298,15 +295,15 @@ export default function AddJobForm({
                 value={form.priority}
                 onChange={v => setPill("priority", v)}
                 colorMap={{
-                  high:   "bg-rose-500/20 text-rose-300 border-rose-500/40",
-                  medium: "bg-amber-500/20 text-amber-300 border-amber-500/40",
-                  low:    "bg-slate-700 text-slate-300 border-slate-600",
+                  high:   "bg-rose-500/20 text-rose-700 border-rose-300/50",
+                  medium: "bg-amber-500/20 text-amber-700 border-amber-300/50",
+                  low:    "bg-gray-200 text-gray-700 border-gray-300",
                 }}
               />
             </div>
 
             {/* Divider */}
-            <div className="border-t border-slate-800" />
+            <div className="border-t border-gray-200" />
 
             {/* Note */}
             <div>
@@ -315,16 +312,16 @@ export default function AddJobForm({
             </div>
 
             {/* Active toggle */}
-            <div className="flex items-center justify-between bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-700/50">
+            <div className="flex items-center justify-between bg-gray-50/50 rounded-xl px-4 py-3 border border-gray-200/50 shadow-sm">
               <div>
-                <p className="text-sm font-semibold text-white">Mark as Active</p>
-                <p className="text-xs text-slate-500 mt-0.5">Active jobs appear highlighted in the tracker</p>
+                <p className="text-sm font-semibold text-gray-900">Mark as Active</p>
+                <p className="text-xs text-gray-600 mt-0.5">Active jobs appear highlighted in the tracker</p>
               </div>
               <button
                 type="button"
                 onClick={() => setForm(p => ({ ...p, isActive: !p.isActive }))}
-                className={`relative w-12 h-6 rounded-full transition-all duration-300 focus:outline-none
-                  ${form.isActive ? "bg-sky-500" : "bg-slate-700"}`}
+                className={`relative w-12 h-6 rounded-full transition-all duration-300 focus:outline-none shadow-sm
+                  ${form.isActive ? "bg-blue-500" : "bg-gray-300"}`}
               >
                 <span
                   className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-md transition-all duration-300
@@ -337,10 +334,10 @@ export default function AddJobForm({
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3.5 rounded-2xl font-bold text-sm tracking-wide transition-all duration-300
+              className={`w-full py-3.5 rounded-2xl font-bold text-sm tracking-wide transition-all duration-300 shadow-lg
                 ${loading
-                  ? "bg-slate-700 text-slate-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-sky-500 to-indigo-500 text-white hover:from-sky-400 hover:to-indigo-400 hover:shadow-lg hover:shadow-sky-500/20 active:scale-[0.98]"
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-400 hover:to-indigo-400 hover:shadow-xl hover:shadow-blue-500/25 active:scale-[0.98]"
                 }`}
             >
               {loading ? (
