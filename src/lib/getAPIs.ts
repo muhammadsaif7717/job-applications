@@ -54,3 +54,12 @@ export async function updateJobById(id: string, data: Record<string, unknown>) {
 }
  
  
+export async function deleteJobById(id: string) {
+  try {
+    const res = await axios.delete(`/api/v1/jobs/delete/${id}`);
+    return res.data;
+  } catch (err: any) {
+    console.error("deleteJobById error:", err.response?.data || err.message);
+    return null;
+  }
+}
