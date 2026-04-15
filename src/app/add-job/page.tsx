@@ -1,364 +1,376 @@
 'use client'
-import axios from "axios";
-import { useState, type ChangeEvent, type FormEvent } from "react";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+import Link from 'next/link'
+import { useSession } from 'next-auth/react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { ArrowLeft, Briefcase, Calendar, CheckCircle2, Globe2, Loader2, MapPin, Sparkles } from 'lucide-react'
+import { createJob } from '@/lib/getAPIs'
+import { createInitialJobForm } from '@/lib/job'
+import { JOB_PRIORITIES, JOB_STATUSES, JOB_TYPES, type JobFormData, type JobStatus, type JobType, type Priority } from '@/types/job'
 
-type JobStatus = "applied" | "interview" | "rejected" | "offer";
-type JobType   = "remote" | "hybrid" | "onsite";
-type Priority  = "high" | "medium" | "low";
+const inputClassName =
+  'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-500/20'
 
-interface JobFormData {
-  companyName: string;
-  position: string;
-  jobLink: string;
-  location: string;
-  jobType: JobType;
-  status: JobStatus;
-  via: string;
-  priority: Priority;
-  date: string;
-  note: string;
-  isActive: boolean;
+function Label({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
+  return (
+    <label htmlFor={htmlFor} className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+      {children}
+    </label>
+  )
 }
 
-const INITIAL_FORM: JobFormData = {
-  companyName: "",
-  position: "",
-  jobLink: "",
-  location: "",
-  jobType: "remote",
-  status: "applied",
-  via: "",
-  priority: "medium",
-  date: new Date().toISOString().split("T")[0],
-  note: "",
-  isActive: true,
-};
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-// ── Small UI Atoms ────────────────────────────────────────────────────────────
-
-const Label = ({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) => (
-  <label
-    htmlFor={htmlFor}
-    className="block text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1.5"
-  >
-    {children}
-  </label>
-);
-
-const inputBase =
-  "w-full bg-white/70 border border-gray-200/60 text-gray-900 text-sm rounded-xl px-4 py-2.5 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all duration-200 shadow-sm";
-
-const Input = ({
-  id, name, type = "text", placeholder, value, onChange, required,
+function Input({
+  id,
+  name,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+  required,
 }: {
-  id: string; name: string; type?: string; placeholder?: string;
-  value: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void; required?: boolean;
-}) => (
-  <input
-    id={id} name={name} type={type} placeholder={placeholder}
-    value={value} onChange={onChange} required={required}
-    className={inputBase}
-  />
-);
+  id: string
+  name: string
+  type?: string
+  placeholder?: string
+  value: string
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void
+  required?: boolean
+}) {
+  return (
+    <input
+      id={id}
+      name={name}
+      type={type}
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+      required={required}
+      className={inputClassName}
+    />
+  )
+}
 
-const Textarea = ({
-  id, name, placeholder, value, onChange, rows = 3,
+function Textarea({
+  id,
+  name,
+  placeholder,
+  value,
+  onChange,
+  rows = 4,
 }: {
-  id: string; name: string; placeholder?: string;
-  value: string; onChange: (e: ChangeEvent<HTMLTextAreaElement>) => void; rows?: number;
-}) => (
-  <textarea
-    id={id} name={name} placeholder={placeholder}
-    value={value} onChange={onChange} rows={rows}
-    className={`${inputBase} resize-none`}
-  />
-);
-
-// ── Pill Toggle Group ─────────────────────────────────────────────────────────
+  id: string
+  name: string
+  placeholder?: string
+  value: string
+  onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void
+  rows?: number
+}) {
+  return (
+    <textarea
+      id={id}
+      name={name}
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+      rows={rows}
+      className={`${inputClassName} resize-none`}
+    />
+  )
+}
 
 function PillGroup<T extends string>({
-  options, value, onChange, colorMap,
+  value,
+  options,
+  onChange,
 }: {
-  options: { value: T; label: string; icon?: string }[];
-  value: T;
-  onChange: (v: T) => void;
-  colorMap?: Record<T, string>;
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (value: T) => void
 }) {
   return (
     <div className="flex flex-wrap gap-2">
-      {options.map(opt => {
-        const active = value === opt.value;
-        const accent = colorMap?.[opt.value];
+      {options.map((option) => {
+        const active = option.value === value
+
         return (
           <button
-            key={opt.value}
+            key={option.value}
             type="button"
-            onClick={() => onChange(opt.value)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 shadow-sm
-              ${active
-                ? accent
-                  ? `${accent} border-transparent shadow-lg scale-105`
-                  : "bg-white/80 text-gray-900 border-transparent shadow-lg scale-105"
-                : "bg-gray-100 text-gray-700 border-gray-200/50 hover:bg-gray-200 hover:text-gray-900"
-              }`}
+            onClick={() => onChange(option.value)}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              active
+                ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/15 dark:bg-white dark:text-slate-900'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
+            }`}
           >
-            {opt.icon && <span className="mr-1">{opt.icon}</span>}
-            {opt.label}
+            {option.label}
           </button>
-        );
+        )
       })}
     </div>
-  );
+  )
 }
 
-// ── Success Toast ─────────────────────────────────────────────────────────────
-
-const SuccessToast = ({ id, onClose }: { id: string; onClose: () => void }) => (
-  <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-emerald-500/95 border border-emerald-400/50 text-white px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-sm animate-fade-in">
-    <span className="text-lg">✅</span>
-    <div>
-      <p className="text-sm font-bold">Job added!</p>
-      <p className="text-xs font-mono">{id}</p>
+function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <div className="fixed left-1/2 top-4 z-50 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-3xl border border-emerald-200 bg-white px-5 py-4 shadow-2xl dark:border-emerald-400/20 dark:bg-slate-950">
+      <div className="flex items-start gap-3">
+        <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-500" />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">Application saved</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{message}</p>
+        </div>
+        <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          ×
+        </button>
+      </div>
     </div>
-    <button onClick={onClose} className="ml-2 text-white/80 hover:text-white transition-colors text-lg leading-none">×</button>
-  </div>
-);
+  )
+}
 
-// ── Main Form Component ───────────────────────────────────────────────────────
+export default function AddJobPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [form, setForm] = useState<JobFormData>(() => createInitialJobForm())
+  const [toast, setToast] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-export default function AddJobForm({
-  onSubmit,
-}: {
-  onSubmit?: (job: JobFormData & {  createdAt: string; updatedAt: string }) => void;
-}) {
-  const [form, setForm]       = useState<JobFormData>(INITIAL_FORM);
-  const [toast, setToast]     = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace(`/auth/sign-in?callbackUrl=${encodeURIComponent(pathname || '/add-job')}`)
+    }
+  }, [pathname, router, status])
 
-  const set = (field: keyof JobFormData) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setForm(prev => ({ ...prev, [field]: e.target.value }));
+  const set =
+    (field: keyof JobFormData) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setForm((current) => ({ ...current, [field]: event.target.value }))
+    }
 
-  const setPill = <K extends keyof JobFormData>(field: K, value: JobFormData[K]) =>
-    setForm(prev => ({ ...prev, [field]: value }));
+  const setPill = <K extends keyof JobFormData>(field: K, value: JobFormData[K]) => {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setLoading(true)
+    setError(null)
 
     try {
-      // simulate delay (optional)
-      await new Promise((r) => setTimeout(r, 700));
+      const created = await createJob(form)
 
-      const now = new Date().toISOString().split("T")[0];
-      const newJob = { ...form, createdAt: now, updatedAt: now };
-
-      // 🔹 Axios POST request
-      const res = await axios.post("/api/v1/jobs/post", newJob);
-
-      if (res.data.success) {
-        console.log("✅ New Job Submitted:", res.data.data);
-        setToast(`${res.data.data.companyName} added successfully!`);
-        
-        // reset form
-        setForm(INITIAL_FORM);
-
-        // optional: call parent submit callback
-        onSubmit?.(res.data.data);
-      } else {
-        console.error("❌ Submission failed:", res.data.message);
-        setToast("Submission failed");
+      if (!created) {
+        throw new Error('Submission failed')
       }
-    } catch (err) {
-      console.error("❌ Error submitting job:", err);
-      setToast("Error submitting job");
+
+      setToast(`${created.companyName} added successfully. Redirecting to dashboard...`)
+      setForm(createInitialJobForm())
+
+      window.setTimeout(() => {
+        router.push('/')
+      }, 1200)
+    } catch (submitError) {
+      console.error('Error submitting job:', submitError)
+      setError('Something went wrong while saving the application.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <>
-      <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;0,900;1,400&display=swap"
-        rel="stylesheet"
-      />
-
-      <div
-        className="min-h-screen bg-gray-50 flex items-start justify-center p-6 py-10"
-        style={{ fontFamily: "'DM Sans', sans-serif" }}
-      >
-        <div className="w-full max-w-2xl">
-
-          {/* Header */}
-          <div className="mb-8 flex items-center gap-3">
-            <div className="w-2 h-9 rounded-full bg-gradient-to-b from-blue-400 to-indigo-500" />
-            <div>
-              <h1 className="text-2xl font-black text-gray-900 tracking-tight">Add Application</h1>
-              <p className="text-gray-600 text-sm font-medium">Track a new job you've applied to</p>
-            </div>
-          </div>
-
-          {/* Card */}
-          <form
-            onSubmit={handleSubmit}
-            className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 flex flex-col gap-6 shadow-xl"
-          >
-
-            {/* Row 1: Company + Position */}
-            <div className="grid sm:grid-cols-2 gap-5">
-              <div>
-                <Label htmlFor="companyName">Company Name *</Label>
-                <Input id="companyName" name="companyName" placeholder="e.g. Google" value={form.companyName} onChange={set("companyName")} required />
-              </div>
-              <div>
-                <Label htmlFor="position">Position *</Label>
-                <Input id="position" name="position" placeholder="e.g. Frontend Engineer" value={form.position} onChange={set("position")} required />
-              </div>
-            </div>
-
-            {/* Row 2: Link + Location */}
-            <div className="grid sm:grid-cols-2 gap-5">
-              <div>
-                <Label htmlFor="jobLink">Job Link</Label>
-                <Input id="jobLink" name="jobLink" type="url" placeholder="https://..." value={form.jobLink} onChange={set("jobLink")} />
-              </div>
-              <div>
-                <Label htmlFor="location">Location *</Label>
-                <Input id="location" name="location" placeholder="e.g. Remote / Berlin" value={form.location} onChange={set("location")} required />
-              </div>
-            </div>
-
-            {/* Row 3: Date + Via */}
-            <div className="grid sm:grid-cols-2 gap-5">
-              <div>
-                <Label htmlFor="date">Application Date</Label>
-                <Input id="date" name="date" type="date" value={form.date} onChange={set("date")} />
-              </div>
-              <div>
-                <Label htmlFor="via">Applied Via</Label>
-                <Input id="via" name="via" placeholder="e.g. LinkedIn, Indeed, Referral" value={form.via} onChange={set("via")} />
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-gray-200" />
-
-            {/* Job Type */}
-            <div>
-              <Label htmlFor="jobType">Job Type</Label>
-              <PillGroup<JobType>
-                options={[
-                  { value: "remote", label: "Remote", icon: "🌐" },
-                  { value: "hybrid", label: "Hybrid", icon: "🔀" },
-                  { value: "onsite", label: "Onsite", icon: "🏢" },
-                ]}
-                value={form.jobType}
-                onChange={v => setPill("jobType", v)}
-              />
-            </div>
-
-            {/* Status */}
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <PillGroup<JobStatus>
-                options={[
-                  { value: "applied",   label: "Applied"   },
-                  { value: "interview", label: "Interview" },
-                  { value: "rejected",  label: "Rejected"  },
-                  { value: "offer",     label: "Offer"     },
-                ]}
-                value={form.status}
-                onChange={v => setPill("status", v)}
-                colorMap={{
-                  applied:   "bg-sky-500/20 text-sky-700 border-sky-300/50",
-                  interview: "bg-amber-500/20 text-amber-700 border-amber-300/50",
-                  rejected:  "bg-rose-500/20 text-rose-700 border-rose-300/50",
-                  offer:     "bg-emerald-500/20 text-emerald-700 border-emerald-300/50",
-                }}
-              />
-            </div>
-
-            {/* Priority */}
-            <div>
-              <Label htmlFor="priority">Priority</Label>
-              <PillGroup<Priority>
-                options={[
-                  { value: "high",   label: "⚑ High"   },
-                  { value: "medium", label: "⚑ Medium" },
-                  { value: "low",    label: "⚑ Low"    },
-                ]}
-                value={form.priority}
-                onChange={v => setPill("priority", v)}
-                colorMap={{
-                  high:   "bg-rose-500/20 text-rose-700 border-rose-300/50",
-                  medium: "bg-amber-500/20 text-amber-700 border-amber-300/50",
-                  low:    "bg-gray-200 text-gray-700 border-gray-300",
-                }}
-              />
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-gray-200" />
-
-            {/* Note */}
-            <div>
-              <Label htmlFor="note">Notes</Label>
-              <Textarea id="note" name="note" placeholder="Any extra context — interview tips, recruiter name, deadline..." value={form.note} onChange={set("note")} rows={3} />
-            </div>
-
-            {/* Active toggle */}
-            <div className="flex items-center justify-between bg-gray-50/50 rounded-xl px-4 py-3 border border-gray-200/50 shadow-sm">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Mark as Active</p>
-                <p className="text-xs text-gray-600 mt-0.5">Active jobs appear highlighted in the tracker</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setForm(p => ({ ...p, isActive: !p.isActive }))}
-                className={`relative w-12 h-6 rounded-full transition-all duration-300 focus:outline-none shadow-sm
-                  ${form.isActive ? "bg-blue-500" : "bg-gray-300"}`}
-              >
-                <span
-                  className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-md transition-all duration-300
-                    ${form.isActive ? "left-7" : "left-1"}`}
-                />
-              </button>
-            </div>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full py-3.5 rounded-2xl font-bold text-sm tracking-wide transition-all duration-300 shadow-lg
-                ${loading
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-400 hover:to-indigo-400 hover:shadow-xl hover:shadow-blue-500/25 active:scale-[0.98]"
-                }`}
+      <div className="app-shell">
+        <div className="page-wrap grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+          <section className="glass-panel rise-in p-5 sm:p-8">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
             >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                  Saving...
-                </span>
-              ) : (
-                "＋ Add Application"
-              )}
-            </button>
+              <ArrowLeft className="h-4 w-4" />
+              Back to dashboard
+            </Link>
 
-          </form>
+            <div className="mt-8">
+              <div className="hero-chip">
+                <Sparkles className="h-4 w-4" />
+                New application
+              </div>
+              <h1 className="mt-5 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl dark:text-slate-50">
+                Capture the details while they’re fresh.
+              </h1>
+              <p className="mt-4 text-sm leading-7 text-slate-600 sm:text-base dark:text-slate-300">
+                Save the core information now so follow-ups, interview prep, and status changes stay easy later.
+              </p>
+            </div>
+
+            <div className="mt-8 space-y-3">
+              {[
+                { icon: Briefcase, label: 'Company and role', value: 'Keep titles clean for quick scanning later.' },
+                { icon: Calendar, label: 'Application date', value: 'Helpful when follow-up timing matters.' },
+                { icon: Globe2, label: 'Source and work style', value: 'Remote, hybrid, on-site, referral, and more.' },
+                { icon: MapPin, label: 'Location and notes', value: 'Recruiter names, salary hints, or interview prep.' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-2xl border border-slate-200/70 bg-white/75 p-4 dark:border-white/10 dark:bg-slate-900/70">
+                  <div className="flex items-start gap-3">
+                    <item.icon className="mt-0.5 h-5 w-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{item.label}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.value}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {status === 'authenticated' ? (
+            <form onSubmit={handleSubmit} className="glass-panel rise-in p-5 sm:p-8">
+              <div className="mb-6 rounded-[1.6rem] border border-emerald-200 bg-emerald-50/70 px-4 py-4 dark:border-emerald-400/20 dark:bg-emerald-500/10">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-200">Posting as</p>
+                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-50">{session?.user?.email}</p>
+              </div>
+
+              {error && (
+                <div className="mb-6 rounded-[1.6rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm text-rose-700 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  {error}
+                </div>
+              )}
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="companyName">Company name</Label>
+                  <Input id="companyName" name="companyName" placeholder="Stripe" value={form.companyName} onChange={set('companyName')} required />
+                </div>
+                <div>
+                  <Label htmlFor="position">Position</Label>
+                  <Input id="position" name="position" placeholder="Product Designer" value={form.position} onChange={set('position')} required />
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="jobLink">Job link</Label>
+                  <Input id="jobLink" name="jobLink" type="url" placeholder="https://..." value={form.jobLink} onChange={set('jobLink')} />
+                </div>
+                <div>
+                  <Label htmlFor="location">Location</Label>
+                  <Input id="location" name="location" placeholder="Remote / New York" value={form.location} onChange={set('location')} required />
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="date">Application date</Label>
+                  <Input id="date" name="date" type="date" value={form.date} onChange={set('date')} />
+                </div>
+                <div>
+                  <Label htmlFor="via">Applied via</Label>
+                  <Input id="via" name="via" placeholder="LinkedIn, referral, website" value={form.via} onChange={set('via')} />
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-slate-200/80 pt-6 dark:border-white/10">
+                <Label htmlFor="jobType">Job type</Label>
+                <PillGroup<JobType>
+                  value={form.jobType}
+                  onChange={(value) => setPill('jobType', value)}
+                  options={JOB_TYPES.map((value) => ({
+                    value,
+                    label: value === 'onsite' ? 'On-site' : value.charAt(0).toUpperCase() + value.slice(1),
+                  }))}
+                />
+              </div>
+
+              <div className="mt-6">
+                <Label htmlFor="status">Status</Label>
+                <PillGroup<JobStatus>
+                  value={form.status}
+                  onChange={(value) => setPill('status', value)}
+                  options={JOB_STATUSES.map((value) => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1) }))}
+                />
+              </div>
+
+              <div className="mt-6">
+                <Label htmlFor="priority">Priority</Label>
+                <PillGroup<Priority>
+                  value={form.priority}
+                  onChange={(value) => setPill('priority', value)}
+                  options={JOB_PRIORITIES.map((value) => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1) }))}
+                />
+              </div>
+
+              <div className="mt-6">
+                <Label htmlFor="note">Notes</Label>
+                <Textarea
+                  id="note"
+                  name="note"
+                  placeholder="Interview tips, recruiter names, salary range, or anything worth remembering."
+                  value={form.note}
+                  onChange={set('note')}
+                />
+              </div>
+
+              <div className="mt-6 flex flex-col gap-4 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-slate-900/70">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Keep this role active</p>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Active jobs stay visible in your main workflow.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setForm((current) => ({ ...current, isActive: !current.isActive }))}
+                  className={`relative h-7 w-14 rounded-full transition ${form.isActive ? 'bg-slate-900 dark:bg-white' : 'bg-slate-300 dark:bg-slate-700'}`}
+                  aria-pressed={form.isActive}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition dark:bg-slate-900 ${
+                      form.isActive ? 'left-8 dark:bg-slate-900' : 'left-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`inline-flex flex-1 items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold transition ${
+                    loading
+                      ? 'cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                      : 'bg-slate-900 text-white shadow-xl shadow-slate-900/15 hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100'
+                  }`}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save application'
+                  )}
+                </button>
+                <Link
+                  href="/"
+                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                >
+                  Cancel
+                </Link>
+              </div>
+            </form>
+          ) : (
+            <section className="glass-panel p-6 sm:p-8">
+              <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-50">Redirecting to sign-in...</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base dark:text-slate-300">
+                This page is protected. You&apos;ll be sent to sign in and then returned here automatically.
+              </p>
+            </section>
+          )}
         </div>
       </div>
 
-      {/* Toast */}
-      {toast && <SuccessToast id={toast} onClose={() => setToast(null)} />}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
-  );
+  )
 }

@@ -1,30 +1,30 @@
-import { MongoClient, ServerApiVersion } from 'mongodb'
+import { Db, MongoClient, ServerApiVersion } from "mongodb";
 
-export const connectDb = async () => {
-  let db
-  if (db) {
-    return db
-  }
+const uri = process.env.MONGODB_URI ?? process.env.NEXT_PUBLIC_MONGODB_URI;
 
-  const uri = process.env.NEXT_PUBLIC_MONGODB_URI
+if (!uri) {
+  throw new Error("Missing MongoDB URI");
+}
 
-  if (!uri) {
-    throw new Error('Missing MongoDB URI')
-  }
+declare global {
+  var mongoClientPromise: Promise<MongoClient> | undefined;
+}
 
-  try {
-    const client = new MongoClient(uri, {
-      serverApi: {
-        version: ServerApiVersion.v1,
-        strict: true,
-        deprecationErrors: true,
-      },
-    })
+const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
+});
 
-    const db = client.db('TrackMyJob')
-    console.log('Connected to MongoDB successfully')
-    return db
-  } catch (err) {
-    throw new Error(`Failed to connect to MongoDB ${err}`)
-  }
+const clientPromise = global.mongoClientPromise ?? client.connect();
+
+if (process.env.NODE_ENV !== "production") {
+  global.mongoClientPromise = clientPromise;
+}
+
+export async function connectDb(): Promise<Db> {
+  const connectedClient = await clientPromise;
+  return connectedClient.db("TrackMyJob");
 }

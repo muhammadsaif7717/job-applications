@@ -1,277 +1,262 @@
 'use client'
-import { useSession, signOut } from 'next-auth/react'
-import { useState, useEffect, useRef } from 'react'
+
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { 
-  Home, 
-  Plus, 
-  Briefcase, 
-  User, 
-  LogOut, 
-  ChevronDown, 
-  Settings,
-  Calendar,
-  X,
-  Menu 
-} from 'lucide-react'
+import { signOut, useSession } from 'next-auth/react'
+import { useState } from 'react'
+import { BriefcaseBusiness, ChevronRight, LogOut, Menu, Plus, User, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import ThemeToggle from '@/components/ThemeToggle'
 
-const Navbar = () => {
+const navItems = [
+  { href: '/', authLabel: 'Dashboard', guestLabel: 'Home', icon: BriefcaseBusiness },
+  { href: '/add-job', label: 'Add Application', icon: Plus },
+]
+
+export default function Navbar() {
   const pathname = usePathname()
   const { data: session, status } = useSession()
-  const [isClient, setIsClient] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const sidebarRef = useRef<HTMLDivElement>(null)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  // Close sidebar when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
-        setSidebarOpen(false)
-      }
-    }
-
-    if (sidebarOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [sidebarOpen])
-
-  const navItems = [
-    { href: '/', label: 'Jobs', icon: Briefcase },
-    { href: '/add-job', label: 'Add Job', icon: Plus },
-    // { href: '/calendar', label: 'Calendar', icon: Calendar },
-  ]
-
-  if (!isClient) {
-    return (
-      <nav className="bg-white/95 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="h-8 w-32 bg-gray-200/50 rounded-xl animate-pulse" />
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 bg-gray-200/50 rounded-full animate-pulse" />
-            <div className="h-8 w-24 bg-gray-200/50 rounded-xl animate-pulse ml-4" />
-          </div>
-        </div>
-      </nav>
-    )
+  if (pathname === '/auth/sign-in') {
+    return null
   }
+
+  const accountName = session?.user?.name || 'Guest'
+  const accountEmail = session?.user?.email || 'Sign in to sync your applications'
+  const accountInitial = accountName.charAt(0).toUpperCase() || 'G'
 
   return (
     <>
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation overlay"
+          className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-sm md:hidden"
+          onClick={() => setMobileOpen(false)}
         />
       )}
 
-      <nav className="bg-white/95 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50 shadow-sm supports-[backdrop-filter:blur()]:bg-white/90">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-all duration-200">
-                <Briefcase className="w-5 h-5 text-white drop-shadow-sm" />
-              </div>
-              <span className="text-xl font-black bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-transparent tracking-tight hidden md:inline">
-                JobTracker
-              </span>
-            </Link>
+      <header className="sticky top-0 z-50 px-3 pt-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 rounded-[28px] border border-white/60 bg-white/72 px-3 py-3 shadow-[0_22px_55px_-30px_rgba(34,55,90,0.45)] backdrop-blur-2xl transition-colors duration-300 sm:px-5 dark:border-white/10 dark:bg-slate-950/72 dark:shadow-[0_22px_55px_-28px_rgba(0,0,0,0.7)]">
+          <Link href="/" className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#265dff,#2aa6ff_52%,#43c49d)] shadow-lg shadow-blue-500/20">
+              <BriefcaseBusiness className="h-5 w-5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-black uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                Job Tracker
+              </p>
+              <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                Focused search workspace
+              </p>
+            </div>
+          </Link>
 
-            {/* Desktop Nav */}
-            <div className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon
-                const isActive = pathname === item.href
-                return (
+          <nav className="ml-auto hidden items-center gap-2 md:flex">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href
+              const label =
+                'label' in item
+                  ? item.label
+                  : session?.user
+                    ? item.authLabel
+                    : item.guestLabel
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all duration-300 ${
+                    isActive
+                      ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-900'
+                      : 'text-slate-600 hover:-translate-y-0.5 hover:bg-slate-100/90 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </Link>
+              )
+            })}
+          </nav>
+
+          <div className="hidden items-center gap-3 md:flex">
+            <ThemeToggle />
+
+            {status === 'loading' ? (
+              <div className="h-11 w-32 animate-pulse rounded-2xl bg-slate-200/80 dark:bg-slate-800" />
+            ) : session?.user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
-                    key={item.href}
-                    variant={isActive ? "secondary" : "ghost"}
-                    asChild
-                    className={`
-                      rounded-2xl h-11 px-4 gap-2 font-semibold transition-all duration-200
-                      ${isActive 
-                        ? 'bg-blue-500/10 backdrop-blur-sm border border-blue-200/50 shadow-lg shadow-blue-100/20 text-blue-700 scale-105' 
-                        : 'hover:bg-gray-50 hover:border hover:border-gray-200 hover:shadow-md text-gray-700'
-                      }
-                    `}
+                    variant="ghost"
+                    className="h-auto rounded-2xl border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/75 dark:hover:bg-slate-800"
                   >
-                    <Link href={item.href} className="flex items-center gap-2">
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-blue-500' : 'text-gray-600 group-hover:text-blue-500'}`} />
-                      {item.label}
-                    </Link>
-                  </Button>
-                )
-              })}
-            </div>
-
-            {/* Right side - Auth/User + Mobile menu */}
-            <div className="flex items-center gap-3">
-              {/* Auth Links - Desktop only */}
-              {!session && status !== 'loading' && (
-                <div className="hidden lg:flex items-center gap-2">
-                  <Link 
-                    href="/auth/sign-in"
-                    className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors px-4 py-2 rounded-xl hover:bg-gray-50"
-                  >
-                    Sign In
-                  </Link>
-                  <Link 
-                    href="/auth/sign-up"
-                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold px-6 py-2.5 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200 h-11"
-                  >
-                    Get Started
-                  </Link>
-                </div>
-              )}
-
-              {/* User Dropdown */}
-              {session && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild className="outline-none focus:outline-none">
-                    <Button 
-                      variant="ghost" 
-                      className="relative h-11 w-11 rounded-2xl hover:bg-gray-50 p-0 gap-2 shadow-md hover:shadow-lg transition-all duration-200"
-                    >
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage 
-                          src={session.user?.image || undefined} 
-                          alt={session.user?.name || 'User'}
-                        />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-semibold text-sm">
-                          {session.user?.name?.charAt(0).toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <ChevronDown className="w-4 h-4 shrink-0 text-gray-500 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent 
-                    align="end" 
-                    className="w-64 mr-2 bg-white border-gray-200 rounded-2xl p-2 shadow-2xl border shadow-gray-200/50"
-                  >
-                    <div className="px-4 py-3 border-b border-gray-200/50 mb-2">
-                      <div className="font-semibold text-gray-900 truncate">{session.user?.name}</div>
-                      <div className="text-sm text-gray-500 truncate">{session.user?.email}</div>
+                    <Avatar className="h-10 w-10 border border-white/70 shadow-sm dark:border-white/10">
+                      <AvatarImage src={session.user.image || ''} alt={accountName} />
+                      <AvatarFallback className="bg-slate-900 text-white dark:bg-white dark:text-slate-900">
+                        {accountInitial}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="max-w-32 px-2 text-left">
+                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {accountName}
+                      </p>
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        {accountEmail}
+                      </p>
                     </div>
-                    
-                    <DropdownMenuItem asChild className="cursor-pointer rounded-xl px-3 py-2.5 hover:bg-gray-50 focus:bg-gray-50">
-                      <Link href="/profile" className="flex items-center gap-3 w-full">
-                        <User className="w-4 h-4 text-gray-700" />
-                        Profile
-                      </Link>
-                    </DropdownMenuItem>
-                    
-                    <DropdownMenuItem asChild className="cursor-pointer rounded-xl px-3 py-2.5 hover:bg-gray-50 focus:bg-gray-50">
-                      <Link href="/settings" className="flex items-center gap-3 w-full">
-                        <Settings className="w-4 h-4 text-gray-700" />
-                        Settings
-                      </Link>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem 
-                      onClick={() => signOut({ callbackUrl: '/' })}
-                      className="cursor-pointer rounded-xl px-3 py-2.5 mt-1 text-red-600 hover:bg-red-50 focus:bg-red-50 border-t border-gray-200/50"
-                    >
-                      <LogOut className="w-4 h-4 mr-3 shrink-0" />
-                      Log out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-
-              {/* Mobile menu button */}
-              <Button
-                variant="ghost"
-                className="lg:hidden p-2 h-11 w-11 rounded-2xl hover:bg-gray-50"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2">
+                  <DropdownMenuItem
+                    onClick={() => signOut({ callbackUrl: '/' })}
+                    className="cursor-pointer rounded-xl px-3 py-2 text-sm font-medium"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link
+                href="/auth/sign-in"
+                className="inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
               >
-                <Menu className="w-6 h-6 lg:hidden text-gray-700" />
-                <X className="w-6 h-6 hidden lg:block text-gray-700" />
-              </Button>
-            </div>
+                Sign in
+              </Link>
+            )}
+          </div>
+
+          <div className="ml-auto flex items-center gap-2 md:hidden">
+            <ThemeToggle compact />
+            <button
+              type="button"
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white/85 text-slate-700 shadow-sm transition dark:border-white/10 dark:bg-slate-900/75 dark:text-slate-100"
+              onClick={() => setMobileOpen((open) => !open)}
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* Mobile Sidebar - LIGHT MODE */}
-      <div 
-        ref={sidebarRef}
-        className={`
-          fixed top-0 left-0 h-full w-72 bg-white/95 backdrop-blur-md border-r border-gray-200/50 
-          transform transition-transform duration-300 ease-in-out z-50
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:hidden shadow-2xl shadow-gray-200/50
-        `}
+      <aside
+        className={`fixed inset-y-0 right-0 z-50 flex w-[min(24rem,92vw)] flex-col border-l border-white/50 bg-white/92 p-5 shadow-2xl backdrop-blur-2xl transition-transform duration-300 md:hidden dark:border-white/10 dark:bg-slate-950/92 ${
+          mobileOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
       >
-        {/* Sidebar Header */}
-        <div className="p-6 border-b border-gray-200/50">
-          <Link href="/" className="flex items-center gap-3 group" onClick={() => setSidebarOpen(false)}>
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <Briefcase className="w-5 h-5 text-white drop-shadow-sm" />
-            </div>
-            <span className="text-xl font-black bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-transparent">
-              JobTracker
-            </span>
-          </Link>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+              Navigation
+            </p>
+            <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">
+              Stay organized
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            onClick={() => setMobileOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* Sidebar Nav */}
-        <div className="p-4 space-y-2 pt-6">
+        <div className="space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
+            const label =
+              'label' in item
+                ? item.label
+                : session?.user
+                  ? item.authLabel
+                  : item.guestLabel
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`
-                  flex items-center gap-3 p-4 rounded-2xl transition-all duration-200 group
-                  ${isActive 
-                    ? 'bg-blue-500/10 backdrop-blur-sm border border-blue-200/50 shadow-lg font-semibold text-blue-700' 
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 hover:border hover:border-gray-200'
-                  }
-                `}
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-sm font-semibold transition ${
+                  isActive
+                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                    : 'bg-slate-100/80 text-slate-700 dark:bg-slate-900/80 dark:text-slate-200'
+                }`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-blue-500' : 'text-gray-600 group-hover:text-blue-500'}`} />
-                <span className="font-medium">{item.label}</span>
+                <span className="flex items-center gap-3">
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </span>
+                <ChevronRight className="h-4 w-4 opacity-60" />
               </Link>
             )
           })}
-
-          {/* Auth Links in Sidebar */}
-          {!session && status !== 'loading' && (
-            <div className="pt-4 border-t border-gray-200/50 space-y-2">
-              <Link 
-                href="/auth/sign-in"
-                onClick={() => setSidebarOpen(false)}
-                className="flex items-center gap-3 p-4 rounded-2xl text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200"
-              >
-                Sign In
-              </Link>
-              <Link 
-                href="/auth/sign-up"
-                onClick={() => setSidebarOpen(false)}
-                className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold shadow-lg transition-all duration-200"
-              >
-                Get Started
-              </Link>
-            </div>
-          )}
         </div>
-      </div>
+
+        <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50/90 p-4 dark:border-white/10 dark:bg-slate-900/80">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+            Theme
+          </p>
+          <div className="mt-3">
+            <ThemeToggle />
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50/90 p-4 dark:border-white/10 dark:bg-slate-900/80">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+            Account
+          </p>
+          <div className="mt-3 flex items-center gap-3">
+            <Avatar className="h-11 w-11 border border-white shadow-sm dark:border-slate-800">
+              <AvatarImage src={session?.user?.image || ''} alt={accountName} />
+              <AvatarFallback className="bg-slate-900 text-white dark:bg-white dark:text-slate-900">
+                {accountInitial}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {accountName}
+              </p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{accountEmail}</p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            {session?.user ? (
+              <button
+                type="button"
+                className="flex w-full items-center justify-center rounded-2xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+                onClick={() => signOut({ callbackUrl: '/' })}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Log out
+              </button>
+            ) : (
+              <Link
+                href="/auth/sign-in"
+                onClick={() => setMobileOpen(false)}
+                className="flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
+              >
+                <User className="mr-2 h-4 w-4" />
+                Sign in
+              </Link>
+            )}
+          </div>
+        </div>
+      </aside>
     </>
   )
 }
-
-export default Navbar

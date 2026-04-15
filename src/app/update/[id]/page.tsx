@@ -1,429 +1,499 @@
-"use client";
+'use client'
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { getJobById, updateJobById } from "@/lib/getAPIs";
+import Link from 'next/link'
+import { useSession } from 'next-auth/react'
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useParams, usePathname, useRouter } from 'next/navigation'
+import { ArrowLeft, CheckCircle2, Loader2, PencilLine, RefreshCcw, ShieldCheck } from 'lucide-react'
+import { getJobById, updateJobById } from '@/lib/getAPIs'
+import { isJobFormDirty, toJobFormData } from '@/lib/job'
+import { JOB_PRIORITIES, JOB_STATUSES, JOB_TYPES, type Job, type JobFormData, type JobStatus, type JobType, type Priority } from '@/types/job'
 
-// ── Types ────────────────────────────────────────────────────────────────────
+const inputClassName =
+  'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-500/20'
 
-type JobStatus = "applied" | "interview" | "rejected" | "offer";
-type JobType   = "remote" | "hybrid" | "onsite";
-type Priority  = "high" | "medium" | "low";
-
-interface Job {
-  _id: string;
-  date: string;
-  companyName: string;
-  jobLink: string;
-  location: string;
-  position: string;
-  jobType: JobType;
-  status: JobStatus;
-  via: string;
-  note: string;
-  isActive: boolean;
-  priority: Priority;
-  createdAt: string;
-  updatedAt: string;
+function Label({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
+  return (
+    <label htmlFor={htmlFor} className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+      {children}
+    </label>
+  )
 }
 
-type JobFormData = Omit<Job, "_id" | "createdAt" | "updatedAt">;
+function Input({
+  id,
+  name,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+  required,
+}: {
+  id: string
+  name: string
+  type?: string
+  placeholder?: string
+  value: string
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void
+  required?: boolean
+}) {
+  return (
+    <input
+      id={id}
+      name={name}
+      type={type}
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+      required={required}
+      className={inputClassName}
+    />
+  )
+}
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+function Textarea({
+  id,
+  name,
+  placeholder,
+  value,
+  onChange,
+  rows = 4,
+}: {
+  id: string
+  name: string
+  placeholder?: string
+  value: string
+  onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void
+  rows?: number
+}) {
+  return (
+    <textarea
+      id={id}
+      name={name}
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+      rows={rows}
+      className={`${inputClassName} resize-none`}
+    />
+  )
+}
 
-const toFormData = (job: Job): JobFormData => ({
-  date: job.date,
-  companyName: job.companyName,
-  jobLink: job.jobLink,
-  location: job.location,
-  position: job.position,
-  jobType: job.jobType,
-  status: job.status,
-  via: job.via,
-  note: job.note,
-  isActive: job.isActive,
-  priority: job.priority,
-});
-
-const isDirty = (original: Job, current: JobFormData): boolean =>
-  (Object.keys(current) as (keyof JobFormData)[]).some(
-    (key) => String(current[key]) !== String(original[key as keyof Job])
-  );
-
-// ── UI Atoms ──────────────────────────────────────────────────────────────────
-
-const Label = ({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) => (
-  <label htmlFor={htmlFor} className="block text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1.5">
-    {children}
-  </label>
-);
-
-const inputBase =
-  "w-full bg-white/70 border border-gray-200/60 text-gray-900 text-sm rounded-xl px-4 py-2.5 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all duration-200 shadow-sm";
-
-const Input = ({ id, name, type = "text", placeholder, value, onChange, required }: {
-  id: string; name: string; type?: string; placeholder?: string;
-  value: string; onChange: (e: ChangeEvent<HTMLInputElement>) => void; required?: boolean;
-}) => (
-  <input id={id} name={name} type={type} placeholder={placeholder}
-    value={value} onChange={onChange} required={required} className={inputBase} />
-);
-
-const Textarea = ({ id, name, placeholder, value, onChange, rows = 3 }: {
-  id: string; name: string; placeholder?: string;
-  value: string; onChange: (e: ChangeEvent<HTMLTextAreaElement>) => void; rows?: number;
-}) => (
-  <textarea id={id} name={name} placeholder={placeholder}
-    value={value} onChange={onChange} rows={rows} className={`${inputBase} resize-none`} />
-);
-
-function PillGroup<T extends string>({ options, value, onChange, colorMap }: {
-  options: { value: T; label: string; icon?: string }[];
-  value: T;
-  onChange: (v: T) => void;
-  colorMap?: Record<T, string>;
+function PillGroup<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (value: T) => void
 }) {
   return (
     <div className="flex flex-wrap gap-2">
-      {options.map((opt) => {
-        const active = value === opt.value;
-        const accent = colorMap?.[opt.value];
+      {options.map((option) => {
+        const active = value === option.value
+
         return (
-          <button key={opt.value} type="button" onClick={() => onChange(opt.value)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200
-              ${active
-                ? accent ? `${accent} border-transparent shadow-lg scale-105` : "bg-white/80 text-gray-900 border-transparent shadow-lg scale-105"
-                : "bg-gray-100 text-gray-700 border-gray-200/50 hover:bg-gray-200 hover:text-gray-900"
-              }`}>
-            {opt.icon && <span className="mr-1">{opt.icon}</span>}
-            {opt.label}
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              active
+                ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/15 dark:bg-white dark:text-slate-900'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
+            }`}
+          >
+            {option.label}
           </button>
-        );
+        )
       })}
     </div>
-  );
+  )
 }
 
-const ChangedDot = () => (
-  <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-blue-400 align-middle" title="Modified" />
-);
+function Toast({
+  kind,
+  onClose,
+}: {
+  kind: 'success' | 'reset'
+  onClose: () => void
+}) {
+  const copy =
+    kind === 'success'
+      ? { title: 'Changes saved', text: 'Your application details have been updated.' }
+      : { title: 'Form reset', text: 'Unsaved edits were cleared.' }
 
-const Toast = ({ type, id, onClose }: { type: "success" | "reset"; id?: string; onClose: () => void }) => (
-  <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-sm border
-    ${type === "success" ? "bg-emerald-500/90 border-emerald-400/50 text-white shadow-emerald-500/25" : "bg-gray-500/90 border-gray-400/50 text-white shadow-gray-500/25"}`}>
-    <span className="text-lg">{type === "success" ? "✅" : "↺"}</span>
-    <div>
-      <p className="text-sm font-bold">{type === "success" ? "Job updated!" : "Changes reset"}</p>
-      {id && <p className="text-xs opacity-90 font-mono">{id}</p>}
-    </div>
-    <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100 transition-opacity text-lg leading-none">×</button>
-  </div>
-);
-
-const DiffSummary = ({ original, current }: { original: Job; current: JobFormData }) => {
-  const changed = (Object.keys(current) as (keyof JobFormData)[]).filter(
-    (key) => String(current[key]) !== String(original[key as keyof Job])
-  );
-  if (changed.length === 0) return null;
-  const labels: Record<string, string> = {
-    companyName: "Company", position: "Position", jobLink: "Link", location: "Location",
-    jobType: "Job Type", status: "Status", via: "Via", priority: "Priority",
-    date: "Date", note: "Note", isActive: "Active",
-  };
   return (
-    <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-200/50 rounded-xl px-4 py-3 text-xs text-blue-700">
-      <span className="mt-0.5 shrink-0">✏️</span>
-      <span>
-        <span className="font-bold">{changed.length} field{changed.length > 1 ? "s" : ""} changed: </span>
-        {changed.map((k) => labels[k] ?? k).join(", ")}
-      </span>
+    <div className="fixed left-1/2 top-4 z-50 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-2xl dark:border-white/10 dark:bg-slate-950">
+      <div className="flex items-start gap-3">
+        <CheckCircle2 className={`mt-0.5 h-5 w-5 ${kind === 'success' ? 'text-emerald-500' : 'text-blue-500'}`} />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">{copy.title}</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{copy.text}</p>
+        </div>
+        <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          ×
+        </button>
+      </div>
     </div>
-  );
-};
+  )
+}
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
-
-const Skeleton = () => (
-  <div className="animate-pulse flex flex-col gap-5">
-    {[...Array(5)].map((_, i) => <div key={i} className="h-10 bg-gray-100 rounded-xl w-full shadow-sm" />)}
-    <div className="h-24 bg-gray-100 rounded-xl w-full shadow-sm" />
-    <div className="h-12 bg-gray-100 rounded-2xl w-full shadow-sm" />
-  </div>
-);
-
-// ── Error State ───────────────────────────────────────────────────────────────
-
-const ErrorState = ({ id, onRetry }: { id: string; onRetry: () => void }) => (
-  <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-    <span className="text-5xl text-yellow-500">⚠️</span>
-    <div>
-      <p className="text-gray-900 font-bold text-lg">Failed to load job</p>
-      <p className="text-gray-600 text-sm mt-1">
-        Could not find job with ID{" "}
-        <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-800 shadow-sm">{id}</span>
-      </p>
-      <p className="text-gray-500 text-xs mt-3 max-w-xs mx-auto">
-        Make sure <span className="font-mono text-gray-600">NEXT_PUBLIC_BASE_URL</span> is set in{" "}
-        <span className="font-mono text-gray-600">.env.local</span> and the route{" "}
-        <span className="font-mono text-gray-600">/api/jobs/[id]</span> exists.
-      </p>
+function Skeleton() {
+  return (
+    <div className="glass-panel animate-pulse p-6 sm:p-8">
+      <div className="h-8 w-40 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+      <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <div className="h-12 rounded-2xl bg-slate-100 dark:bg-slate-900" />
+        <div className="h-12 rounded-2xl bg-slate-100 dark:bg-slate-900" />
+      </div>
+      <div className="mt-5 h-12 rounded-2xl bg-slate-100 dark:bg-slate-900" />
+      <div className="mt-5 h-28 rounded-[1.6rem] bg-slate-100 dark:bg-slate-900" />
     </div>
-    <button onClick={onRetry}
-      className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-900 text-sm font-semibold rounded-xl transition-colors border border-gray-200 shadow-sm hover:shadow-md">
-      ↺ Try again
-    </button>
-  </div>
-);
+  )
+}
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+function ErrorState({ id, onRetry }: { id: string; onRetry: () => void }) {
+  return (
+    <div className="glass-panel px-6 py-14 text-center sm:px-10">
+      <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-50">Couldn&apos;t load this application</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+        We couldn&apos;t find the record for <span className="font-mono text-slate-800 dark:text-slate-200">{id}</span>. Try again in a moment.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/15 dark:bg-white dark:text-slate-900"
+      >
+        <RefreshCcw className="h-4 w-4" />
+        Retry
+      </button>
+    </div>
+  )
+}
 
 export default function UpdateJobPage() {
-  const params = useParams();
-  const router = useRouter();
-  const id     = params?.id as string;
+  const { status } = useSession()
+  const params = useParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const id = typeof params?.id === 'string' ? params.id : ''
 
-  const [job,        setJob]        = useState<Job | null>(null);
-  const [form,       setForm]       = useState<JobFormData | null>(null);
-  const [fetchState, setFetchState] = useState<"loading" | "error" | "ready">("loading");
-  const [loading,    setLoading]    = useState(false);
-  const [toast,      setToast]      = useState<{ type: "success" | "reset" } | null>(null);
+  const [job, setJob] = useState<Job | null>(null)
+  const [form, setForm] = useState<JobFormData | null>(null)
+  const [fetchState, setFetchState] = useState<'loading' | 'error' | 'ready'>('loading')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [toast, setToast] = useState<'success' | 'reset' | null>(null)
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
+  const fetchJob = useCallback(async () => {
+    if (!id) {
+      setFetchState('error')
+      return
+    }
 
-  const fetchJob = async () => {
-    setFetchState("loading");
+    setFetchState('loading')
+    setError(null)
+
     try {
-      const data: Job | null = await getJobById(id);
+      const data = await getJobById(id)
 
       if (!data) {
-        setFetchState("error");
-        return;
+        setFetchState('error')
+        return
       }
 
-      setJob(data);
-      setForm(toFormData(data));
-      setFetchState("ready");
-    } catch (err) {
-      console.error("Unexpected error in fetchJob:", err);
-      setFetchState("error");
+      setJob(data)
+      setForm(toJobFormData(data))
+      setFetchState('ready')
+    } catch (fetchError) {
+      console.error('Unexpected error in fetchJob:', fetchError)
+      setFetchState('error')
     }
-  };
+  }, [id])
 
   useEffect(() => {
-    if (id) fetchJob();
-  }, [id]);
+    if (status === 'loading') {
+      setFetchState('loading')
+      return
+    }
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
+    if (status === 'unauthenticated') {
+      router.replace(`/auth/sign-in?callbackUrl=${encodeURIComponent(pathname || `/update/${id}`)}`)
+      return
+    }
 
-  const set = (field: keyof JobFormData) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((prev) => prev ? { ...prev, [field]: e.target.value } : prev);
+    void fetchJob()
+  }, [fetchJob, id, pathname, router, status])
 
-  const setPill = <K extends keyof JobFormData>(field: K, value: JobFormData[K]) =>
-    setForm((prev) => prev ? { ...prev, [field]: value } : prev);
+  const set =
+    (field: keyof JobFormData) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setForm((current) => (current ? { ...current, [field]: event.target.value } : current))
+    }
+
+  const setPill = <K extends keyof JobFormData>(field: K, value: JobFormData[K]) => {
+    setForm((current) => (current ? { ...current, [field]: value } : current))
+  }
+
+  const dirty = useMemo(() => {
+    if (!job || !form) return false
+    return isJobFormDirty(job, form)
+  }, [form, job])
 
   const handleReset = () => {
-    if (!job) return;
-    setForm(toFormData(job));
-    setToast({ type: "reset" });
-  };
+    if (!job) return
+    setForm(toJobFormData(job))
+    setToast('reset')
+    setError(null)
+  }
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!job || !form || !isDirty(job, form)) return;
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!job || !form || !dirty) return
 
-    setLoading(true);
+    setLoading(true)
+    setError(null)
+
     try {
-      const updated = await updateJobById(job._id, form);
-      if (!updated) throw new Error("Failed to update job");
+      const updated = await updateJobById(job._id, form)
 
-      setJob(updated);
-      setForm(toFormData(updated));
-      setToast({ type: "success" });
-    } catch (err) {
-      console.error("Update failed:", err);
+      if (!updated) {
+        throw new Error('Failed to update job')
+      }
+
+      setJob(updated)
+      setForm(toJobFormData(updated))
+      setToast('success')
+
+      window.setTimeout(() => {
+        router.push('/')
+      }, 1200)
+    } catch (submitError) {
+      console.error('Update failed:', submitError)
+      setError('We couldn’t save your changes. Please try again.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
-
-  const changed = (field: keyof JobFormData) =>
-    job && form ? String(form[field]) !== String(job[field as keyof Job]) : false;
-
-  const dirty = job && form ? isDirty(job, form) : false;
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+  }
 
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;900&display=swap" rel="stylesheet" />
+      <div className="app-shell">
+        <div className="page-wrap grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+          <section className="glass-panel rise-in p-5 sm:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to dashboard
+              </Link>
+              <button
+                type="button"
+                onClick={() => router.push('/')}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+              >
+                Cancel
+              </button>
+            </div>
 
-      <div className="min-h-screen bg-gray-50 flex items-start justify-center p-6 py-10"
-        style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        <div className="w-full max-w-2xl">
+            <div className="mt-8">
+              <div className="hero-chip">
+                <PencilLine className="h-4 w-4" />
+                Editing mode
+              </div>
+              <h1 className="mt-5 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl dark:text-slate-50">
+                Update this application without losing context.
+              </h1>
+              <p className="mt-4 text-sm leading-7 text-slate-600 sm:text-base dark:text-slate-300">
+                Refine notes, move roles through the pipeline, and keep only the applications that still deserve your attention.
+              </p>
+            </div>
 
-          {/* Header */}
-          <div className="mb-8 flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-9 rounded-full bg-gradient-to-b from-blue-400 to-indigo-500" />
-              <div>
-                <h1 className="text-2xl font-black text-gray-900 tracking-tight">Edit Application</h1>
-                <p className="text-gray-600 text-sm font-mono">
-                  {fetchState === "ready" ? job?._id : `Loading ID: ${id}`}
+            <div className="mt-8 space-y-3">
+              {[
+                { icon: ShieldCheck, label: 'Protected records', value: 'Only your own applications can be edited.' },
+                { icon: RefreshCcw, label: 'Fast reset', value: 'Clear unsaved edits and return to the last saved version.' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-2xl border border-slate-200/70 bg-white/75 p-4 dark:border-white/10 dark:bg-slate-900/70">
+                  <div className="flex items-start gap-3">
+                    <item.icon className="mt-0.5 h-5 w-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{item.label}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.value}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {status !== 'authenticated' ? (
+            <section className="glass-panel p-6 sm:p-8">
+              <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-50">Sign in required</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base dark:text-slate-300">
+                This page is protected. Sign in to edit one of your saved applications.
+              </p>
+            </section>
+          ) : fetchState === 'loading' || !form ? (
+            <Skeleton />
+          ) : fetchState === 'error' ? (
+            <ErrorState id={id || 'unknown'} onRetry={() => void fetchJob()} />
+          ) : (
+            <form onSubmit={handleSubmit} className="glass-panel rise-in p-5 sm:p-8">
+              <div className="mb-6 rounded-[1.6rem] border border-blue-200 bg-blue-50/70 px-4 py-4 dark:border-blue-400/20 dark:bg-blue-500/10">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-200">Editing</p>
+                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {job?.companyName} • {job?.position}
                 </p>
               </div>
-            </div>
-            <button onClick={() => router.back()} className="text-gray-600 hover:text-gray-900 text-sm transition-colors mt-1 font-medium">
-              ✕ Cancel
-            </button>
-          </div>
 
-          {/* Loading */}
-          {fetchState === "loading" && (
-            <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-lg">
-              <Skeleton />
-            </div>
-          )}
+              {error && (
+                <div className="mb-6 rounded-[1.6rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm text-rose-700 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  {error}
+                </div>
+              )}
 
-          {/* Error */}
-          {fetchState === "error" && (
-            <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-lg">
-              <ErrorState id={id} onRetry={fetchJob} />
-            </div>
-          )}
-
-          {/* Form */}
-          {fetchState === "ready" && job && form && (
-            <form onSubmit={handleSubmit}
-              className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 flex flex-col gap-6 shadow-xl">
-
-              <DiffSummary original={job} current={form} />
-
-              <div className="grid sm:grid-cols-2 gap-5">
+              <div className="grid gap-5 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="companyName">Company Name * {changed("companyName") && <ChangedDot />}</Label>
-                  <Input id="companyName" name="companyName" placeholder="e.g. Google" value={form.companyName} onChange={set("companyName")} required />
+                  <Label htmlFor="companyName">Company name</Label>
+                  <Input id="companyName" name="companyName" placeholder="Stripe" value={form.companyName} onChange={set('companyName')} required />
                 </div>
                 <div>
-                  <Label htmlFor="position">Position * {changed("position") && <ChangedDot />}</Label>
-                  <Input id="position" name="position" placeholder="e.g. Frontend Engineer" value={form.position} onChange={set("position")} required />
+                  <Label htmlFor="position">Position</Label>
+                  <Input id="position" name="position" placeholder="Product Designer" value={form.position} onChange={set('position')} required />
                 </div>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-5">
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="jobLink">Job Link {changed("jobLink") && <ChangedDot />}</Label>
-                  <Input id="jobLink" name="jobLink" type="url" placeholder="https://..." value={form.jobLink} onChange={set("jobLink")} />
+                  <Label htmlFor="jobLink">Job link</Label>
+                  <Input id="jobLink" name="jobLink" type="url" placeholder="https://..." value={form.jobLink} onChange={set('jobLink')} />
                 </div>
                 <div>
-                  <Label htmlFor="location">Location * {changed("location") && <ChangedDot />}</Label>
-                  <Input id="location" name="location" placeholder="e.g. Remote / Berlin" value={form.location} onChange={set("location")} required />
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-5">
-                <div>
-                  <Label htmlFor="date">Application Date {changed("date") && <ChangedDot />}</Label>
-                  <Input id="date" name="date" type="date" value={form.date} onChange={set("date")} />
-                </div>
-                <div>
-                  <Label htmlFor="via">Applied Via {changed("via") && <ChangedDot />}</Label>
-                  <Input id="via" name="via" placeholder="e.g. LinkedIn, Indeed" value={form.via} onChange={set("via")} />
+                  <Label htmlFor="location">Location</Label>
+                  <Input id="location" name="location" placeholder="Remote / New York" value={form.location} onChange={set('location')} required />
                 </div>
               </div>
 
-              <div className="border-t border-gray-200" />
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="date">Application date</Label>
+                  <Input id="date" name="date" type="date" value={form.date} onChange={set('date')} />
+                </div>
+                <div>
+                  <Label htmlFor="via">Applied via</Label>
+                  <Input id="via" name="via" placeholder="LinkedIn, referral, website" value={form.via} onChange={set('via')} />
+                </div>
+              </div>
 
-              <div>
-                <Label htmlFor="jobType">Job Type {changed("jobType") && <ChangedDot />}</Label>
+              <div className="mt-6 border-t border-slate-200/80 pt-6 dark:border-white/10">
+                <Label htmlFor="jobType">Job type</Label>
                 <PillGroup<JobType>
-                  options={[{ value: "remote", label: "Remote", icon: "🌐" }, { value: "hybrid", label: "Hybrid", icon: "🔀" }, { value: "onsite", label: "Onsite", icon: "🏢" }]}
-                  value={form.jobType} onChange={(v) => setPill("jobType", v)}
+                  value={form.jobType}
+                  onChange={(value) => setPill('jobType', value)}
+                  options={JOB_TYPES.map((value) => ({
+                    value,
+                    label: value === 'onsite' ? 'On-site' : value.charAt(0).toUpperCase() + value.slice(1),
+                  }))}
                 />
               </div>
 
-              <div>
-                <Label htmlFor="status">Status {changed("status") && <ChangedDot />}</Label>
+              <div className="mt-6">
+                <Label htmlFor="status">Status</Label>
                 <PillGroup<JobStatus>
-                  options={[{ value: "applied", label: "Applied" }, { value: "interview", label: "Interview" }, { value: "rejected", label: "Rejected" }, { value: "offer", label: "Offer" }]}
-                  value={form.status} onChange={(v) => setPill("status", v)}
-                  colorMap={{ 
-                    applied: "bg-sky-500/20 text-sky-700 border-sky-300/50", 
-                    interview: "bg-amber-500/20 text-amber-700 border-amber-300/50", 
-                    rejected: "bg-rose-500/20 text-rose-700 border-rose-300/50", 
-                    offer: "bg-emerald-500/20 text-emerald-700 border-emerald-300/50" 
-                  }}
+                  value={form.status}
+                  onChange={(value) => setPill('status', value)}
+                  options={JOB_STATUSES.map((value) => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1) }))}
                 />
               </div>
 
-              <div>
-                <Label htmlFor="priority">Priority {changed("priority") && <ChangedDot />}</Label>
+              <div className="mt-6">
+                <Label htmlFor="priority">Priority</Label>
                 <PillGroup<Priority>
-                  options={[{ value: "high", label: "⚑ High" }, { value: "medium", label: "⚑ Medium" }, { value: "low", label: "⚑ Low" }]}
-                  value={form.priority} onChange={(v) => setPill("priority", v)}
-                  colorMap={{ 
-                    high: "bg-rose-500/20 text-rose-700 border-rose-300/50", 
-                    medium: "bg-amber-500/20 text-amber-700 border-amber-300/50", 
-                    low: "bg-gray-200 text-gray-700 border-gray-300" 
-                  }}
+                  value={form.priority}
+                  onChange={(value) => setPill('priority', value)}
+                  options={JOB_PRIORITIES.map((value) => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1) }))}
                 />
               </div>
 
-              <div className="border-t border-gray-200" />
-
-              <div>
-                <Label htmlFor="note">Notes {changed("note") && <ChangedDot />}</Label>
-                <Textarea id="note" name="note" placeholder="Interview tips, recruiter name, deadline..." value={form.note} onChange={set("note")} rows={3} />
+              <div className="mt-6">
+                <Label htmlFor="note">Notes</Label>
+                <Textarea
+                  id="note"
+                  name="note"
+                  placeholder="Interview tips, recruiter names, salary range, or anything worth remembering."
+                  value={form.note}
+                  onChange={set('note')}
+                />
               </div>
 
-              <div className={`flex items-center justify-between rounded-xl px-4 py-3 border transition-colors
-                ${changed("isActive") ? "bg-blue-500/10 border-blue-200/50" : "bg-gray-50/50 border-gray-200/50"}`}>
+              <div className="mt-6 flex flex-col gap-4 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-slate-900/70">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 flex items-center gap-1">
-                    Mark as Active {changed("isActive") && <ChangedDot />}
-                  </p>
-                  <p className="text-xs text-gray-600 mt-0.5">Active jobs appear highlighted in the tracker</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Keep this role active</p>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Active jobs stay visible in your main workflow.</p>
                 </div>
-                <button type="button" onClick={() => setForm((p) => p ? { ...p, isActive: !p.isActive } : p)}
-                  className={`relative w-12 h-6 rounded-full transition-all duration-300 focus:outline-none shadow-sm ${form.isActive ? "bg-blue-500" : "bg-gray-300"}`}>
-                  <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-md transition-all duration-300 ${form.isActive ? "left-7" : "left-1"}`} />
+                <button
+                  type="button"
+                  onClick={() => setForm((current) => (current ? { ...current, isActive: !current.isActive } : current))}
+                  className={`relative h-7 w-14 rounded-full transition ${form.isActive ? 'bg-slate-900 dark:bg-white' : 'bg-slate-300 dark:bg-slate-700'}`}
+                  aria-pressed={form.isActive}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition dark:bg-slate-900 ${
+                      form.isActive ? 'left-8 dark:bg-slate-900' : 'left-1'
+                    }`}
+                  />
                 </button>
               </div>
 
-              <div className="flex gap-3 pt-1">
-                <button type="button" onClick={handleReset} disabled={!dirty}
-                  className={`px-5 py-3 rounded-2xl text-sm font-semibold border transition-all duration-200 shadow-sm
-                    ${dirty ? "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200 hover:text-gray-900 hover:shadow-md" : "bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed"}`}>
-                  ↺ Reset
-                </button>
-                <button type="submit" disabled={loading || !dirty}
-                  className={`flex-1 py-3 rounded-2xl font-bold text-sm tracking-wide transition-all duration-300 shadow-lg
-                    ${loading || !dirty ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-400 hover:to-indigo-400 hover:shadow-xl hover:shadow-blue-500/25 active:scale-[0.98]"}`}>
+              <div className="mt-8 flex flex-col gap-3 lg:flex-row">
+                <button
+                  type="submit"
+                  disabled={!dirty || loading}
+                  className={`inline-flex flex-1 items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold transition ${
+                    !dirty || loading
+                      ? 'cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                      : 'bg-slate-900 text-white shadow-xl shadow-slate-900/15 hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100'
+                  }`}
+                >
                   {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                      </svg>
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Saving...
-                    </span>
-                  ) : !dirty ? "No Changes" : "Save Changes"}
+                    </>
+                  ) : (
+                    'Save changes'
+                  )}
                 </button>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={!dirty || loading}
+                  className={`inline-flex items-center justify-center rounded-2xl border px-5 py-3 text-sm font-semibold transition ${
+                    !dirty || loading
+                      ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-white/10 dark:bg-slate-900 dark:text-slate-500'
+                      : 'border-slate-200 bg-white text-slate-700 shadow-sm hover:-translate-y-0.5 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900'
+                  }`}
+                >
+                  Reset changes
+                </button>
+                <Link
+                  href="/"
+                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                >
+                  Back to dashboard
+                </Link>
               </div>
             </form>
-          )}
-
-          {fetchState === "ready" && job && (
-            <p className="text-center text-xs text-gray-500 mt-4 font-mono">
-              Last updated: {job.updatedAt} · Created: {job.createdAt}
-            </p>
           )}
         </div>
       </div>
 
-      {toast && (
-        <Toast type={toast.type} id={toast.type === "success" ? job?._id : undefined} onClose={() => setToast(null)} />
-      )}
+      {toast && <Toast kind={toast} onClose={() => setToast(null)} />}
     </>
-  );
+  )
 }
